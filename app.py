@@ -184,3 +184,27 @@ with st.expander("ℹ️ 사용법 & 주의사항"):
         - 점수는 보기 좋게 **0~100 범위로 클리핑**하여 표시합니다.
         """
     )
+import pandas as pd
+
+data = [
+    ["female", "group B", "bachelor's degree", "standard", "completed", 78, 85, 82],
+    ["male", "group C", "high school", "free/reduced", "none", 65, 60, 58],
+    ["female", "group A", "master's degree", "standard", "completed", 92, 90, 93],
+    ["male", "group D", "some college", "standard", "none", 70, 68, 65],
+    ["female", "group E", "associate's degree", "free/reduced", "completed", 80, 83, 85],
+    ["male", "group B", "bachelor's degree", "standard", "completed", 88, 84, 81],
+    ["female", "group C", "high school", "free/reduced", "none", 55, 58, 60],
+    ["male", "group A", "master's degree", "standard", "completed", 95, 90, 88],
+    ["female", "group D", "some college", "standard", "none", 73, 75, 70],
+    ["male", "group E", "associate's degree", "free/reduced", "completed", 82, 78, 80],
+]
+
+columns = [
+    "gender", "race_ethnicity", "parental_level_of_education",
+    "lunch", "test_preparation_course",
+    "math_score", "reading_score", "writing_score"
+]
+
+df = pd.DataFrame(data, columns=columns)
+df.to_csv("study_performance_sample.csv", index=False)
+print("✅ 'study_performance_sample.csv' 파일이 현재 폴더에 생성되었습니다!")

@@ -108,16 +108,16 @@ model = Pipeline(
 )
 
 # ---------- 학습/평가 ----------
+from sklearn.metrics import r2_score, mean_squared_error
+
 # ----- 안전한 train/test 분리 -----
 n_samples = len(X)
 
 if n_samples < 5:
-    # 데이터가 너무 적으면 그냥 전체를 학습 + 예측에 같이 사용
     st.warning("데이터가 너무 적어서 train/test로 나누지 않고 전체 데이터를 학습에 사용합니다.")
     X_train, X_test, y_train, y_test = X, X, y, y
     use_holdout = False
 else:
-    # test_size가 너무 커서 train이 0개가 되는 걸 방지
     max_test_ratio = (n_samples - 1) / n_samples  # 최소 1개는 train에 남도록
     effective_test_size = min(float(test_size), max_test_ratio - 1e-6)
 
@@ -127,6 +127,46 @@ else:
         random_state=random_state
     )
     use_holdout = True
+
+# ----- 학습/평가 버튼 -----
+if st.button("🚀 모델 학습/평가 실행", type="primary"):
+    # 1) 학습
+    model.fit(X_train, y_train)
+
+    # 2) 평가
+    if use_holdout:
+        y_pred = model.predict(X_test)
+
+        # 멀티 아웃풋 (math, reading, writing) 기준
+        y_test_df = pd.DataFrame(y_test, columns=target_cols)
+        y_pred_df = pd.DataFrame(y_pred, columns=target_cols)
+
+        st.success("테스트셋 평가 결과")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Math R²", f"{r2_score(y_test_df['math_score'], y_pred_df['math_score']):.3f}")
+        c2.metric("Reading R²", f"{r2_score(y_test_df['reading_score'], y_pred_df['reading_score']):.3f}")
+        c3.metric("Writing R²", f"{r2_score(y_test_df['writing_score'], y_pred_df['writing_score']):.3f}")
+
+        rmse_math = mean_squared_error(y_test_df["math_score"], y_pred_df["math_score"], squared=False)
+        rmse_read = mean_squared_error(y_test_df["reading_score"], y_pred_df["reading_score"], squared=False)
+        rmse_write = mean_squared_error(y_test_df["writing_score"], y_pred_df["writing_score"], squared=False)
+
+        st.caption("RMSE (↓ 낮을수록 좋음)")
+        st.write(
+            {
+                "math_score": round(rmse_math, 3),
+                "reading_score": round(rmse_read, 3),
+                "writing_score": round(rmse_write, 3),
+            }
+        )
+    else:
+        st.info("데이터가 너무 적어서 train/test를 나누지 않고 전체 데이터로만 학습했습니다. R² / RMSE는 계산하지 않았어요.")
+
+    # 3) 예측 폼에서 재사용할 수 있도록 세션에 저장
+    st.session_state["trained_model"] = model
+    st.session_state["factor_cols"] = factor_cols
+    st.session_state["target_cols"] = target_cols
+
 
 
 trained = False
@@ -222,27 +262,3 @@ with st.expander("ℹ️ 사용법 & 주의사항"):
         - 점수는 보기 좋게 **0~100 범위로 클리핑**하여 표시합니다.
         """
     )
-import pandas as pd
-
-data = [
-    ["female", "group B", "bachelor's degree", "standard", "completed", 78, 85, 82],
-    ["male", "group C", "high school", "free/reduced", "none", 65, 60, 58],
-    ["female", "group A", "master's degree", "standard", "completed", 92, 90, 93],
-    ["male", "group D", "some college", "standard", "none", 70, 68, 65],
-    ["female", "group E", "associate's degree", "free/reduced", "completed", 80, 83, 85],
-    ["male", "group B", "bachelor's degree", "standard", "completed", 88, 84, 81],
-    ["female", "group C", "high school", "free/reduced", "none", 55, 58, 60],
-    ["male", "group A", "master's degree", "standard", "completed", 95, 90, 88],
-    ["female", "group D", "some college", "standard", "none", 73, 75, 70],
-    ["male", "group E", "associate's degree", "free/reduced", "completed", 82, 78, 80],
-]
-
-columns = [
-    "gender", "race_ethnicity", "parental_level_of_education",
-    "lunch", "test_preparation_course",
-    "math_score", "reading_score", "writing_score"
-]
-
-df = pd.DataFrame(data, columns=columns)
-df.to_csv("study_performance_sample.csv", index=False)
-print("✅ 'study_performance_sample.csv' 파일이 현재 폴더에 생성되었습니다!")

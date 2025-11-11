@@ -131,8 +131,29 @@ else:
 
 trained = False
 if st.button("🚀 모델 학습/평가 실행", type="primary"):
-    model.fit(X_train, y_train)
-    y_pred = pd.DataFrame(model.predict(X_test), columns=target_cols, index=y_test.index)
+   model.fit(X_train, y_train)
+preds = model.predict(X_test)
+
+if use_holdout:
+    # 테스트셋이 따로 있을 때만 R², RMSE 계산
+    from sklearn.metrics import r2_score, mean_squared_error
+
+    if y.ndim == 1 or y.shape[1] == 1:
+        r2 = r2_score(y_test, preds)
+        rmse = mean_squared_error(y_test, preds, squared=False)
+        st.metric("R²", f"{r2:.3f}")
+        st.metric("RMSE", f"{rmse:.3f}")
+    else:
+        # 멀티 아웃풋일 때 과목별로 계산
+        y_pred_df = pd.DataFrame(preds, columns=target_cols, index=y_test.index)
+        st.success("테스트셋 평가 결과")
+        for col in target_cols:
+            r2 = r2_score(y_test[col], y_pred_df[col])
+            rmse = mean_squared_error(y_test[col], y_pred_df[col], squared=False)
+            st.write(f"- {col}: R²={r2:.3f}, RMSE={rmse:.3f}")
+else:
+    st.info("데이터가 너무 적어서 train/test를 나누지 않고 전체 데이터로만 학습했습니다. R² / RMSE는 따로 계산하지 않았어요.")
+
 
     # 과목별 지표
     r2s, rmses = {}, {}

@@ -5,7 +5,6 @@
 #   - 출력: math_score, reading_score, writing_score 동시 예측
 #   - 업로드한 CSV 기반으로 학습 및 예측
 # ------------------------------------------------------------
-import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -110,15 +109,13 @@ model = Pipeline(
 # ---------- 학습/평가 ----------
 from sklearn.metrics import r2_score, mean_squared_error
 
-# ----- 안전한 train/test 분리 -----
 n_samples = len(X)
-
 if n_samples < 5:
     st.warning("데이터가 너무 적어서 train/test로 나누지 않고 전체 데이터를 학습에 사용합니다.")
     X_train, X_test, y_train, y_test = X, X, y, y
     use_holdout = False
 else:
-    max_test_ratio = (n_samples - 1) / n_samples  # 최소 1개는 train에 남도록
+    max_test_ratio = (n_samples - 1) / n_samples
     effective_test_size = min(float(test_size), max_test_ratio - 1e-6)
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -128,17 +125,13 @@ else:
     )
     use_holdout = True
 
-# ----- 학습/평가 버튼 -----
 if st.button("🚀 모델 학습/평가 실행", type="primary", key="train_eval_button"):
-
     # 1) 학습
     model.fit(X_train, y_train)
 
     # 2) 평가
     if use_holdout:
         y_pred = model.predict(X_test)
-
-        # 멀티 아웃풋 (math, reading, writing) 기준
         y_test_df = pd.DataFrame(y_test, columns=target_cols)
         y_pred_df = pd.DataFrame(y_pred, columns=target_cols)
 
@@ -163,90 +156,39 @@ if st.button("🚀 모델 학습/평가 실행", type="primary", key="train_eval
     else:
         st.info("데이터가 너무 적어서 train/test를 나누지 않고 전체 데이터로만 학습했습니다. R² / RMSE는 계산하지 않았어요.")
 
-    # 3) 예측 폼에서 재사용할 수 있도록 세션에 저장
+    # 예측 폼에서 재사용할 수 있도록 세션에 저장
     st.session_state["trained_model"] = model
     st.session_state["factor_cols"] = factor_cols
     st.session_state["target_cols"] = target_cols
-
-
-
-trained = False
-if st.button("🚀 모델 학습/평가 실행", type="primary"):
-   model.fit(X_train, y_train)
-preds = model.predict(X_test)
-
-if use_holdout:
-    # 테스트셋이 따로 있을 때만 R², RMSE 계산
-    from sklearn.metrics import r2_score, mean_squared_error
-
-    if y.ndim == 1 or y.shape[1] == 1:
-        r2 = r2_score(y_test, preds)
-        rmse = mean_squared_error(y_test, preds, squared=False)
-        st.metric("R²", f"{r2:.3f}")
-        st.metric("RMSE", f"{rmse:.3f}")
-    else:
-        # 멀티 아웃풋일 때 과목별로 계산
-        y_pred_df = pd.DataFrame(preds, columns=target_cols, index=y_test.index)
-        st.success("테스트셋 평가 결과")
-        for col in target_cols:
-            r2 = r2_score(y_test[col], y_pred_df[col])
-            rmse = mean_squared_error(y_test[col], y_pred_df[col], squared=False)
-            st.write(f"- {col}: R²={r2:.3f}, RMSE={rmse:.3f}")
-else:
-    st.info("데이터가 너무 적어서 train/test를 나누지 않고 전체 데이터로만 학습했습니다. R² / RMSE는 따로 계산하지 않았어요.")
-
-
-    # 과목별 지표
-    r2s, rmses = {}, {}
-    for col in target_cols:
-        r2s[col] = r2_score(y_test[col], y_pred[col])
-        rmses[col] = mean_squared_error(y_test[col], y_pred[col], squared=False)
-
-    st.success("모델 학습 완료!")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Math R²", f"{r2s['math_score']:.3f}")
-    c2.metric("Reading R²", f"{r2s['reading_score']:.3f}")
-    c3.metric("Writing R²", f"{r2s['writing_score']:.3f}")
-
-    st.caption("RMSE (↓ 낮을수록 좋음)")
-    st.write({k: round(v, 3) for k, v in rmses.items()})
-
-    # 간단한 캐시 저장 (세션 상태에 담아 예측에서 재사용)
-    st.session_state["trained_model"] = model
-    st.session_state["factor_cols"] = factor_cols
-    st.session_state["target_cols"] = target_cols
-    trained = True
 
 # ---------- 예측 UI ----------
 st.divider()
 st.header("🧮 요인 선택 → 세 과목 점수 예측")
 
-# 각 요인의 선택지(카테고리) 구성
 options = {c: sorted(df[c].dropna().astype(str).unique().tolist()) for c in factor_cols}
 
 with st.form("predict_form"):
     st.subheader("내 요인 선택")
     user_input = {}
     for c in factor_cols:
-        # 값이 하나뿐이어도 selectbox는 동작하도록 기본 index=0
         user_input[c] = st.selectbox(c, options[c], key=f"sel_{c}")
 
-    if st.form_submit_button("📈 예측 실행"):
-        # 학습된 모델이 세션에 없으면 전체 데이터로 즉석 학습
+    submitted = st.form_submit_button("📈 예측 실행")
+    if submitted:
         if "trained_model" in st.session_state:
             use_model = st.session_state["trained_model"]
             used_factors = st.session_state["factor_cols"]
             used_targets = st.session_state["target_cols"]
         else:
-            # 즉석 학습
-            model.fit(X, y)
+            # 아직 학습 안 했으면 전체 데이터로 즉석 학습 후 사용
             use_model = model
+            use_model.fit(X, y)
             used_factors = factor_cols
             used_targets = target_cols
 
         input_df = pd.DataFrame([user_input], columns=used_factors)
         pred = use_model.predict(input_df)[0]
-        pred = np.clip(pred, 0.0, 100.0)  # 점수는 0~100 범위로 보정
+        pred = np.clip(pred, 0.0, 100.0)
 
         st.success("예측 결과")
         out = pd.DataFrame([pred], columns=used_targets, index=["예상 점수"]).T

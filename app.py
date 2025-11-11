@@ -108,9 +108,26 @@ model = Pipeline(
 )
 
 # ---------- 학습/평가 ----------
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=test_size, random_state=random_state
-)
+# ----- 안전한 train/test 분리 -----
+n_samples = len(X)
+
+if n_samples < 5:
+    # 데이터가 너무 적으면 그냥 전체를 학습 + 예측에 같이 사용
+    st.warning("데이터가 너무 적어서 train/test로 나누지 않고 전체 데이터를 학습에 사용합니다.")
+    X_train, X_test, y_train, y_test = X, X, y, y
+    use_holdout = False
+else:
+    # test_size가 너무 커서 train이 0개가 되는 걸 방지
+    max_test_ratio = (n_samples - 1) / n_samples  # 최소 1개는 train에 남도록
+    effective_test_size = min(float(test_size), max_test_ratio - 1e-6)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y,
+        test_size=effective_test_size,
+        random_state=random_state
+    )
+    use_holdout = True
+
 
 trained = False
 if st.button("🚀 모델 학습/평가 실행", type="primary"):

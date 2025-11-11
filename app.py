@@ -129,7 +129,8 @@ else:
     use_holdout = True
 
 # ----- 학습/평가 버튼 -----
-if st.button("🚀 모델 학습/평가 실행", type="primary"):
+if st.button("🚀 모델 학습/평가 실행", type="primary", key="train_eval_button"):
+
     # 1) 학습
     model.fit(X_train, y_train)
 
